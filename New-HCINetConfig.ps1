@@ -241,7 +241,7 @@ foreach ( $node in $configdata.nodes)
                 Write-Host "- Disabling NetQosDcbxSetting on $($pNIC.NAme) adapter"
                 Set-NetQosDcbxSetting -InterfaceAlias $pNIC.Name -Willing $False -Force  | Out-Null
                 #Disable flow control (Global Pause) on physical adapters
-                Write-Host "+ Disabling IEEE 802.3 FlowControler on $($pNIC.NAme) adapter"
+                Write-Host "+ Disabling IEEE 802.3 FlowControl on $($pNIC.NAme) adapter"
                 Set-NetAdapterAdvancedProperty -Name $pNIC.Name -RegistryKeyword "*FlowControl" -RegistryValue 0  | Out-Null
             }
 
@@ -275,7 +275,7 @@ foreach ( $node in $configdata.nodes)
             {
                 foreach( $vNIC in $configdata[$node].vSwitches.HostvNICs)
                 {
-                    Write-Host -ForegroundColor  "Checking networking connectivy from $env:computername to $node/$($vNIC.IpAddr)"
+                    Write-Host "Checking networking connectivy from $env:computername to $node/$($vNIC.IpAddr)"
                     if ( Test-Connection $vNIC.IpAddr ){
                         Write-Host -ForegroundColor Green "Ping is OK!"
                     }
