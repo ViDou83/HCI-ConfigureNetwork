@@ -7,13 +7,14 @@
 
     Nodes = @("Redstone-HP-01","Redstone-HP-02")
 
-    DCBEnabled= $true
-
     "Redstone-HP-01" = @{
+        
+        DCBEnabled= $true
+
         pNICS = 
         @(
-        @{ Name = "pNIC1";  RDMAEnabled=$true; RDMAMode="iWARP"; VmmqEnabled=$true; NumberOfReceiveQueues=16; };
-        @{ Name = "pNIC2";  RDMAEnabled=$true; RDMAMode="iWARP"; VmmqEnabled=$true; NumberOfReceiveQueues=16; };   
+            @{ Name = "pNIC1";  RDMAEnabled=$true; RDMAMode="iWARP"; VmmqEnabled=$true; NumberOfReceiveQueues=16; };
+            @{ Name = "pNIC2";  RDMAEnabled=$true; RDMAMode="iWARP"; VmmqEnabled=$true; NumberOfReceiveQueues=16; };   
         )
 
         vSwitches = 
@@ -44,10 +45,12 @@
 
    "Redstone-HP-02" = @{
 
+        DCBEnabled= $true
+
         pNICS = 
         @(
-        @{ Name = "pNIC1";  RDMAEnabled=$true; RDMAMode="iWARP"; VmmqEnabled=$true; NumberOfReceiveQueues=16; };
-        @{ Name = "pNIC2";  RDMAEnabled=$true; RDMAMode="iWARP"; VmmqEnabled=$true; NumberOfReceiveQueues=16; };   
+            @{ Name = "pNIC1";  RDMAEnabled=$true; RDMAMode="iWARP"; VmmqEnabled=$true; NumberOfReceiveQueues=16; };
+            @{ Name = "pNIC2";  RDMAEnabled=$true; RDMAMode="iWARP"; VmmqEnabled=$true; NumberOfReceiveQueues=16; };   
         )
 
         vSwitches = 

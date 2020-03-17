@@ -36,8 +36,10 @@ foreach ( $node in $configdata.nodes)
     $username=$configdata.LocalAdmin
     $password= $LocalAdminPassword | ConvertTo-SecureString -asPlainText -Force
     $credential =  New-Object System.Management.Automation.PSCredential("$node\$username", $password )
+    Write-Host -ForegroundColor Yellow "########################################"
+    Write-Host -ForegroundColor Yellow "#   Configuring Networking on $node"
+    Write-Host -ForegroundColor Yellow "########################################"
 
-    Write-Host -ForegroundColor Yellow "Configuring Networking on $node"
     invoke-command -ComputerName $node -Credential $credential {
         $configdata=$args[0]
         ################
@@ -45,7 +47,7 @@ foreach ( $node in $configdata.nodes)
         #####   Checking pNICs
         #########
         ################
-        Write-Host -ForegroundColor Yellow "Checking if pNICs are existing and not bound to any vSwitch or holding TCPIP config"
+        Write-Host "- Checking if pNICs are existing and not bound to any vSwitch or holding TCPIP config"
         $pNICs=$configdata.pNICs
         foreach( $pNIC in $pNICs)
         {
@@ -57,7 +59,7 @@ foreach ( $node in $configdata.nodes)
             {
                 $NicGuid=((Get-NetAdapter $pNIC.Name).InterfaceGuid).replace("{","").replace("}","")
 
-                Write-Host -ForegroundColor Yellow "Checking that pNICs are not bound to any vSwitch"
+                Write-Host "- Checking that pNICs are not bound to any vSwitch"
                 $CurrentVswitches=Get-VMSwitch -ea SilentlyContinue
                 foreach( $CurrentvSwitch in $CurrentVswitches)
                 {
@@ -71,13 +73,13 @@ foreach ( $node in $configdata.nodes)
                     }
                 }
                 
-                Write-Host -ForegroundColor Green "Reseting NetAdapterAdvancedProperty for $($pNIC.Name)"
+                Write-Host -ForegroundColor Yellow "Reseting NetAdapterAdvancedProperty for $($pNIC.Name)"
                 reset-netadapteradvancedproperty $pNIC.Name -DisplayName *        
             }
             #
             if ( $pNIC.VmmqEnabled )
             {
-                Write-Host -ForegroundColor Green "Enabling VMMQ on $($pNIC.Name)"
+                Write-Host -ForegroundColor Yellow "Enabling VMMQ on $($pNIC.Name)"
                 Set-NetAdapterAdvancedProperty $pNIC.Name -RegistryKeyword "*RssOnHostVPorts" -RegistryValue 1
                 Write-Host -ForegroundColor Green "Configuring $($pNIC.NumberOfReceiveQueues) Queues on $($pNIC.Name)"
                 Set-NetAdapterRss $pNIC.Name -NumberOfReceiveQueues $pNIC.NumberOfReceiveQueues
@@ -103,7 +105,10 @@ foreach ( $node in $configdata.nodes)
             }
             else 
             {
-                Write-Host -ForegroundColor Yellow "Creating vSwitch $($vSwitch.Name)"
+                Write-Host -ForegroundColor Yellow "########################################"   
+                Write-Host -ForegroundColor Yellow "#    Creating vSwitch $($vSwitch.Name)"
+                Write-Host -ForegroundColor Yellow "########################################"
+        
                 New-VmSwitch -Name $vSwitch.name -EnableEmbeddedTeaming $vSwitch.SetEnabled `
                     -NetAdapterName $vSwitch.pNICs.Name -AllowManagementOS $vSwitch.MgmtOS
                 if ( ! (Get-VMSwitch $vSwitch.Name -ea SilentlyContinue) )
@@ -113,23 +118,23 @@ foreach ( $node in $configdata.nodes)
                 #Creating host vNIC
                 foreach( $HOSTvNIC in $vSwitch.HostvNICs )
                 {
-                    Write-Host -ForegroundColor Green "Adding Host vNIC $($HOSTvNIC.Name)"
+                    Write-Host -ForegroundColor Yellow "+ Adding Host vNIC $($HOSTvNIC.Name)"
                     Add-VMNetworkAdapter -ManagementOS -Name $HOSTvNIC.Name -SwitchName $vSwitch.Name
                     #To be sure that the vNIC is well created
                     sleep 10
                     $NIC = Get-NetAdapter "*$($HOSTvNIC.Name)*"
                     
-                    Write-Host -ForegroundColor Green "Configure Host vNIC $($HOSTvNIC.Name) IP Configuration $($HOSTvNIC.IpAddr)/$($HOSTvNIC.CIDR)"
+                    Write-Host -ForegroundColor Yellow "+ Configure Host vNIC $($HOSTvNIC.Name) IP Configuration $($HOSTvNIC.IpAddr)/$($HOSTvNIC.CIDR)"
                     $NIC | New-NetIPAddress -IpAddress $HOSTvNIC.IpAddr -PrefixLength $HOSTvNIC.CIDR -DefaultGateway $HOSTvNIC.GW | Out-Null
                     if ( $HOSTvNIC.DNS )
                     {
-                        Write-Host -ForegroundColor Green "Configure Host vNIC $($HOSTvNIC.Name) DNS Srv=$($HOSTvNIC.DNS)"
+                        Write-Host -ForegroundColor Yellow "+ Configure Host vNIC $($HOSTvNIC.Name) DNS Srv=$($HOSTvNIC.DNS)"
                         $vNIC | Set-DnsClientServerAddress -ServerAddresses $HOSTvNIC.DNS
                     }
 
                     if ( $HOSTvNIC.VmmqEnabled )
                     {
-                        Write-Host -ForegroundColor Green "Enabling VMMQ on vNIC $($HOSTvNIC.Name)"
+                        Write-Host "+ Enabling VMMQ on vNIC $($HOSTvNIC.Name)"
                         Get-VMNetworkAdapter -ManagementOS $HOSTvNIC.Name | Set-VMNetworkAdapter -VmmqEnabled $HOSTvNIC.VmmqEnabled
                     }
                     else
@@ -139,7 +144,7 @@ foreach ( $node in $configdata.nodes)
 
                     if ( $HOSTvNIC.RDMAEnabled )
                     {
-                        Write-Host -ForegroundColor Green "Enabling RDMA on vNIC $($HOSTvNIC.Name)"
+                        Write-Host "+ Enabling RDMA on vNIC $($HOSTvNIC.Name)"
                         $NIC | Enable-NetAdapterRdma 
                     }
                     else
@@ -147,17 +152,15 @@ foreach ( $node in $configdata.nodes)
                         $NIC | Disable-NetAdapterRdma 
                     }
                 
-                    Write-Host -ForegroundColor Green "Rss Config: forcing base proc to 2 for vNIC $($HOSTvNIC.Name)"
+                    Write-Host -ForegroundColor Yellow "+ Rss Config: forcing base proc to 2 for vNIC $($HOSTvNIC.Name)"
                     $NIC | Set-NetAdapterRss -BaseProcessorGroup 0 -BaseProcessorNumber 2
 
                     #### Configuring SwitchTeamMapping
-                    Write-Host -ForegroundColor Green "Configuring VMNetworkAdapterTeamMapping for $($HOSTvNIC.Name) on  $($pNICs.Name[$index])"
+                    Write-Host -ForegroundColor Yellow "+ Configuring VMNetworkAdapterTeamMapping for $($HOSTvNIC.Name) on  $($pNICs.Name[$index])"
                     Set-VMNetworkAdapterTeamMapping -VMNetworkAdapterName $HostvNIC.Name -ManagementOS `
-                        -PhysicalNetAdapterName $pNICs.Name[$index]
+                        -PhysicalNetAdapterName $pNICs.Name[$index] | Out-Null
                     $index++
                 }
-                #Checking TeamMapping
-                Get-VMNetworkAdapter -All | Get-VMNetworkAdapterTeamMapping
             }
         }
 
@@ -170,8 +173,10 @@ foreach ( $node in $configdata.nodes)
         $index=0
         if ( $configdata.AutoSyntheticAccelerationConfig )
         {
+            Write-Host -ForegroundColor Yellow "########################################"
             Write-Host -ForegroundColor Yellow `
                 "Configuring Synthetic Acceleration: vRSS/VMMQ/VMQ and so on based on NUMA topology and LPs numbers detected!"
+            Write-Host -ForegroundColor Yellow "########################################"
             
             $LPs=0
             $NUMANode=Get-VMHostNumaNode
@@ -180,7 +185,7 @@ foreach ( $node in $configdata.nodes)
                 $LPs+=$NUMA.ProcessorsAvailability.count
             }
 
-            Write-Host -ForegroundColor Green "Trying to pin each pNIC to a different Numa Node"
+            Write-Host -ForegroundColor Yellow "+ Trying to pin each pNIC to a different Numa Node"
             foreach( $pNIC in $configdata.pNICs)
             {
                 if ( $NUMANode.count -gt 1 )
@@ -191,66 +196,71 @@ foreach ( $node in $configdata.nodes)
                 }
                 get-NetAdapterRss $pNIC.Name | ft
                 
-                Write-Host -ForegroundColor Green "VMQ Config: Using all LPs available except LP=0"
+                Write-Host -ForegroundColor Yellow "+ VMQ Config: Using all LPs available except LP=0"
                 Set-NetAdapterVMQ $pNIC.Name -BaseProcessorGroup 0 -BaseProcessorNumber 2 -MaxProcessors $($LPs/2)
                 get-NetAdapterVMQ $pNIC.Name | ft
 
-                Write-Host -ForegroundColor Green "Rss Config: Setting NumberOfReceiveQueues to $($pNIC.NumberOfReceiveQueues)"
+                Write-Host -ForegroundColor Yellow "+ Rss Config: Setting NumberOfReceiveQueues to $($pNIC.NumberOfReceiveQueues)"
                 Set-NetAdapterRss $pNIC.Name -NumberOfReceiveQueues $pNIC.NumberOfReceiveQueues
             }
         }
-    } -ArgumentList $configdata[$node]
+
+        ################
+        #########
+        #####   Configuring DCB
+        #########
+        ################
+        if ( $configdata.DCBEnabled )
+        {
+
+            Write-Host -ForegroundColor Yellow "########################################"
+            Write-Host -ForegroundColor Yellow "#   Configuring DCB on $node"
+            Write-Host -ForegroundColor Yellow "########################################"
+
+            if ( ! (Get-WindowsFeature Data-Center-Bridging).Installed )
+            {
+                #Install DCB
+                Install-WindowsFeature -Name Data-Center-Bridging
+            }
+            #Set policy for Cluster Heartbeats
+            Write-Host -ForegroundColor Yellow "+ Creating Cluster NetQoSPolicy"
+            New-NetQosPolicy "Cluster" -Cluster -PriorityValue8021Action 7 | Out-Null   
+            New-NetQosTrafficClass "Cluster" -Priority 7 -BandwidthPercentage 1 -Algorithm ETS  | Out-Null
+            #Set policy for SMB-Direct 
+            Write-Host -ForegroundColor Yellow "+ Creating SMB NetQoSPolicy"
+            New-NetQosPolicy "SMB" -NetDirectPortMatchCondition 445 -PriorityValue8021Action 3  | Out-Null
+            Enable-NetQosFlowControl -priority 3  | Out-Null
+            New-NetQosTrafficClass "SMB" -priority 3 -bandwidthpercentage 50 -algorithm ETS  | Out-Null
+
+            foreach( $pNIC in $pNICs)
+            {
+                #Enabling QoS at NetAdapter Level
+                Write-Host "+ Enabling NetQos on $($pNIC.NAme) adapter"
+                Enable-NetAdapterQos -InterfaceAlias $pNIC.Name  | Out-Null
+                #Block DCBX settings from the switch
+                Write-Host "- Disabling NetQosDcbxSetting on $($pNIC.NAme) adapter"
+                Set-NetQosDcbxSetting -InterfaceAlias $pNIC.Name -Willing $False -Force  | Out-Null
+                #Disable flow control (Global Pause) on physical adapters
+                Write-Host "+ Disabling IEEE 802.3 FlowControler on $($pNIC.NAme) adapter"
+                Set-NetAdapterAdvancedProperty -Name $pNIC.Name -RegistryKeyword "*FlowControl" -RegistryValue 0  | Out-Null
+            }
+
+            #Set policy for the rest of the traffic 
+            Write-Host -ForegroundColor Yellow "+ Creating Default traffic NetQoSPolicy"
+            New-NetQosPolicy "DEFAULT" -Default -PriorityValue8021Action 0 | Out-Null
+            Disable-NetQosFlowControl -priority 0,1,2,4,5,6,7  | Out-Null
+        }
+    } -ArgumentList $configdata[$node]  
 }
 
-################
-#########
-#####   Configuring DCB
-#########
-################
-if ( $configdata.DCBEnabled )
-{
-    Write-Host -ForegroundColor Yellow "Configuring DCB"
-    if ( ! (Get-WindowsFeature Data-Center-Bridging).Installed )
-    {
-        #Install DCB
-        Install-WindowsFeature -Name Data-Center-Bridging
-    }
-    #Set policy for Cluster Heartbeats
-    New-NetQosPolicy "Cluster" -Cluster -PriorityValue8021Action 7    
-    New-NetQosTrafficClass "Cluster" -Priority 7 -BandwidthPercentage 1 -Algorithm ETS
-    #Set policy for SMB-Direct 
-    New-NetQosPolicy "SMB" -NetDirectPortMatchCondition 445 -PriorityValue8021Action 3
-    Enable-NetQosFlowControl -priority 3
-    New-NetQosTrafficClass "SMB" -priority 3 -bandwidthpercentage 50 -algorithm ETS
-
-    foreach( $pNIC in $pNICs)
-    {
-        #Enabling QoS at NetAdapter Level
-        Enable-NetAdapterQos -InterfaceAlias $pNIC.Name
-        #Block DCBX settings from the switch
-        Set-NetQosDcbxSetting -InterfaceAlias $pNIC.Name -Willing $False
-        # Disable flow control (Global Pause) on physical adapters
-        Set-NetAdapterAdvancedProperty -Name $pNIC.Name -RegistryKeyword "*FlowControl" -RegistryValue 0
-    }
-
-    # Set policy for the rest of the traffic 
-    New-NetQosPolicy "DEFAULT" -Default -PriorityValue8021Action 0
-    Disable-NetQosFlowControl -priority 0,1,2,4,5,6,7
-
-    #Checking Config
-    Get-NetQosFlowControl
-    foreach( $pNIC in $pNICs)
-    {
-        Get-NetAdapterQos -Name $pNIC.Name
-    }
-}
-
-################
 #########
 #####   Checking cluster nodes connectivity 
 #########
 ################
-Write-Host -ForegroundColor Yellow "Checking cluster nodes connectivity"
+Write-Host -ForegroundColor Yellow "########################################"
+Write-Host -ForegroundColor Yellow "#    Checking cluster nodes connectivity"
+Write-Host -ForegroundColor Yellow "########################################"
+
 foreach ( $node in $configdata.nodes)
 {
     $username=$configdata.LocalAdmin
@@ -265,7 +275,7 @@ foreach ( $node in $configdata.nodes)
             {
                 foreach( $vNIC in $configdata[$node].vSwitches.HostvNICs)
                 {
-                    Write-Host -ForegroundColor Yellow "Checking networking connectivy from $env:computername to $node/$($vNIC.IpAddr)"
+                    Write-Host -ForegroundColor  "Checking networking connectivy from $env:computername to $node/$($vNIC.IpAddr)"
                     if ( Test-Connection $vNIC.IpAddr ){
                         Write-Host -ForegroundColor Green "Ping is OK!"
                     }
