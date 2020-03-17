@@ -88,11 +88,42 @@ foreach ( $node in $configdata.nodes)
             {
                 Set-NetAdapterAdvancedProperty $pNIC.Name -RegistryKeyword "*RssOnHostVPorts" -RegistryValue 0
             }
+            #RDMA mode iWARP or ROCe
+            if ( $pNIC.RDMAEnabled)
+            {
+                Write-Host "+ Enabling RDMA/NetworkDirect on $($pNIC.Name)"
+                Set-NetAdapterAdvancedProperty $pNIC.Name -RegistryKeyword "*NetworkDirect" -RegistryValue 1
+                if ( $pNIC.RDMAMode -eq "iWARP")
+                {
+                    Write-Host -ForegroundColor Yellow "+ Enabling iWARP on $($pNIC.Name)"
+                    Set-NetAdapterAdvancedProperty $pNIC.Name -RegistryKeyword "*NetworkDirectTechnology" -RegistryValue 1
+                }
+                elseif ( $pNIC.RDMAMode -eq "RoCE")
+                {
+                    Write-Host -ForegroundColor Yellow "+ Enabling iWARP on $($pNIC.Name)"
+                    Set-NetAdapterAdvancedProperty $pNIC.Name -RegistryKeyword "*NetworkDirectTechnology" -RegistryValue 3
+                }
+                elseif ( $pNIC.RDMAMode -eq "RoCEv2")
+                {
+                    Write-Host -ForegroundColor Yellow "+ Enabling iWARP on $($pNIC.Name)"
+                    Set-NetAdapterAdvancedProperty $pNIC.Name -RegistryKeyword "*NetworkDirectTechnology" -RegistryValue 4
+                }
+                else
+                {
+                    throw "$($pNIC.Name) bad RDMA/NetworkDirect specified in the config File. Valids are iWARP/RoCE/RoCEv2"
+                }
+            }
+            #JumboFRames
+            if ( $pNIC.JumboFrames )
+            {
+                Write-Host "+ Enabling JumboFrame 9K on $($pNIC.Name)"
+                Set-NetAdapterAdvancedProperty $pNIC.Name -RegistryKeyword "*JumboPacket" -RegistryValue 9014
+            }
         }
 
         ################
         #########
-        #####   vSwitch configuration
+        #####   vSwitch configuration 
         #########
         ################
         $index=0
@@ -150,6 +181,12 @@ foreach ( $node in $configdata.nodes)
                     else
                     {
                         $NIC | Disable-NetAdapterRdma 
+                    }
+                    #JumboFrames
+                    if ( $pNIC.JumboFrames )
+                    {
+                        Write-Host "+ Enabling JumboFrame 9K on $($HOSTvNIC.Name)"
+                        $NIC | Set-NetAdapterAdvancedProperty -RegistryKeyword "*JumboPacket" -RegistryValue 9014
                     }
                 
                     Write-Host -ForegroundColor Yellow "+ Rss Config: forcing base proc to 2 for vNIC $($HOSTvNIC.Name)"
