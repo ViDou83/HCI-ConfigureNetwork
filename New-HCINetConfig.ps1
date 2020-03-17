@@ -204,6 +204,49 @@ foreach ( $node in $configdata.nodes)
 
 ################
 #########
+#####   Configuring DCB
+#########
+################
+if ( $configdata.DCBEnabled )
+{
+    Write-Host -ForegroundColor Yellow "Configuring DCB"
+    if ( ! (Get-WindowsFeature Data-Center-Bridging).Installed )
+    {
+        #Install DCB
+        Install-WindowsFeature -Name Data-Center-Bridging
+    }
+    #Set policy for Cluster Heartbeats
+    New-NetQosPolicy "Cluster" -Cluster -PriorityValue8021Action 7    
+    New-NetQosTrafficClass "Cluster" -Priority 7 -BandwidthPercentage 1 -Algorithm ETS
+    #Set policy for SMB-Direct 
+    New-NetQosPolicy "SMB" -NetDirectPortMatchCondition 445 -PriorityValue8021Action 3
+    Enable-NetQosFlowControl -priority 3
+    New-NetQosTrafficClass "SMB" -priority 3 -bandwidthpercentage 50 -algorithm ETS
+
+    foreach( $pNIC in $pNICs)
+    {
+        #Enabling QoS at NetAdapter Level
+        Enable-NetAdapterQos -InterfaceAlias $pNIC.Name
+        #Block DCBX settings from the switch
+        Set-NetQosDcbxSetting -InterfaceAlias $pNIC.Name -Willing $False
+        # Disable flow control (Global Pause) on physical adapters
+        Set-NetAdapterAdvancedProperty -Name $pNIC.Name -RegistryKeyword "*FlowControl" -RegistryValue 0
+    }
+
+    # Set policy for the rest of the traffic 
+    New-NetQosPolicy "DEFAULT" -Default -PriorityValue8021Action 0
+    Disable-NetQosFlowControl -priority 0,1,2,4,5,6,7
+
+    #Checking Config
+    Get-NetQosFlowControl
+    foreach( $pNIC in $pNICs)
+    {
+        Get-NetAdapterQos -Name $pNIC.Name
+    }
+}
+
+################
+#########
 #####   Checking cluster nodes connectivity 
 #########
 ################

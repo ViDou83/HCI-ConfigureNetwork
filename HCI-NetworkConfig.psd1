@@ -7,6 +7,8 @@
 
     Nodes = @("Redstone-HP-01","Redstone-HP-02")
 
+    DCBEnabled= $true
+
     "Redstone-HP-01" = @{
         pNICS = 
         @(
@@ -17,7 +19,7 @@
         vSwitches = 
         @( 
                 @{ 
-                Name = "SDN"; 
+                Name = "S2DSwitch"; 
                 SetEnabled = $true
                 MgmtOS = $false
                 pNICs =  @( 
