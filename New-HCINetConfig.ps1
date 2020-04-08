@@ -33,14 +33,16 @@ $LocalAdminPassword = $LocalAdminCred.GetNetworkCredential().Password
 
 foreach ( $node in $configdata.nodes)
 {
+    $HypvNode=$node.HypvNode
+
     $username=$configdata.LocalAdmin
     $password= $LocalAdminPassword | ConvertTo-SecureString -asPlainText -Force
-    $credential =  New-Object System.Management.Automation.PSCredential("$node\$username", $password )
+    $credential =  New-Object System.Management.Automation.PSCredential("$HypvNode\$username", $password )
     Write-Host -ForegroundColor Yellow "########################################"
-    Write-Host -ForegroundColor Yellow "#   Configuring Networking on $node"
+    Write-Host -ForegroundColor Yellow "#   Configuring Networking on $HypvNode"
     Write-Host -ForegroundColor Yellow "########################################"
 
-    invoke-command -ComputerName $node -Credential $credential {
+    invoke-command -ComputerName $HypvNode -Credential $credential {
         $configdata=$args[0]
         ################
         #########
@@ -287,17 +289,17 @@ foreach ( $node in $configdata.nodes)
             New-NetQosPolicy "DEFAULT" -Default -PriorityValue8021Action 0 | Out-Null
             Disable-NetQosFlowControl -priority 0,1,2,4,5,6,7  | Out-Null
         }
-    } -ArgumentList $configdata[$node]  
+    } -ArgumentList $node  
 }
 
 #########
 #####   Checking cluster nodes connectivity 
 #########
 ################
+<#
 Write-Host -ForegroundColor Yellow "########################################"
 Write-Host -ForegroundColor Yellow "#    Checking cluster nodes connectivity"
 Write-Host -ForegroundColor Yellow "########################################"
-
 foreach ( $node in $configdata.nodes)
 {
     $username=$configdata.LocalAdmin
@@ -325,3 +327,4 @@ foreach ( $node in $configdata.nodes)
         }
     } -ArgumentList $configdata
 }
+#>
